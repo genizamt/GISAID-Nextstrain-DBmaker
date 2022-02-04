@@ -1,0 +1,258 @@
+---
+title: "GISAID/Nextclade Database"
+author: "Matt Geniza"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    collapsed: true
+    toc_depth: 3
+    code_folding: hide
+    theme: sandstone
+    number_sections: false
+    highlight: zenburn
+---
+
+```{r setup, echo=FALSE, message=FALSE, results='markup'}
+# load libraries 
+library(knitr)
+library(pander)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(here)
+library(magrittr)
+library(lubridate)
+library(forcats)
+library(readr)
+library(utils)
+library(datasets)
+library(tibble)
+library(stats)
+library(purrr)
+library(tidyr)
+library(xlsx)
+
+# Set up code chunk options
+opts_chunk$set(echo = TRUE, message = TRUE, results = 'markup', warning = FALSE)
+setwd("/Users/matthewgeniza/Desktop/OHA_CQLS_Background_Freqency/")
+```
+
+# Background
+
+## Purpose
+
+### Questions of interest
+
+## loading in dataframe
+
+```{r, include = FALSE}
+
+#before merging - date columns in both augur and nextclade must be in MM/DD/YY. nextclade file must perform a separator on "|" to extract "gisaid_epi_isl" for merging downstream
+#load in augur data
+augurDF <- list.files(path = "/Users/matthewgeniza/Desktop/OHA_CQLS_Background_Freqency/augurData/", pattern = "*tsv", full.names = TRUE) %>% lapply(read_tsv) %>% bind_rows()
+
+augurDF <- as.data.frame(augurDF)
+
+#View(augurDF)
+
+#load in nextclade data
+nextcladeDF <- list.files(path = "/Users/matthewgeniza/Desktop/OHA_CQLS_Background_Freqency/nextcladeData", pattern = "*tsv", full.names = TRUE) %>% lapply(read_tsv) %>% bind_rows()
+
+nextcladeDF <- as.data.frame(nextcladeDF)
+
+#View(nextcladeDF)
+#merge augur and nextclade based on gisaid id
+dfAugurNextclade <- merge( x = augurDF, y = nextcladeDF, by = "gisaid_epi_isl", all = TRUE)
+
+View(dfAugurNextclade)
+
+dfAugurNextclade$date.x <- as.Date(dfAugurNextclade$date.x,  format = "%m/%d/%y")
+
+dfAugurNextclade$date.y <- as.Date(dfAugurNextclade$date.y,  format = "%m/%d/%y")
+
+dfAugurNextclade$date_submitted <- as.Date(dfAugurNextclade$date_submitted,  format = "%m/%d/%y")
+
+dfAugurNextclade<- (dfAugurNextclade[order(dfAugurNextclade$date.x ),])
+
+#removing known miscalls from beta and delta
+dfAugurNextclade <- filter(dfAugurNextclade, gisaid_epi_isl != "EPI_ISL_2304824" & gisaid_epi_isl != "EPI_ISL_2895840" & gisaid_epi_isl != "EPI_ISL_2838583" & gisaid_epi_isl != "EPI_ISL_2838586" & gisaid_epi_isl != "EPI_ISL_2838654" & gisaid_epi_isl != "EPI_ISL_2693134" & gisaid_epi_isl != "EPI_ISL_2785264" & gisaid_epi_isl != "EPI_ISL_3750734") # & date_submitted < "2021-08-11" )
+
+#write_excel_csv(dfAugurNextclade, file = "/Users/matthewgeniza/Desktop/dfAugurNextclade01062022.csv")
+
+#DB <- read_csv("dfAugurNextclade_OR08232021.csv")
+```
+
+
+#  lineage counts in total datafram
+
+```{r}
+
+#total lineage count
+lineageCount = count(dfAugurNextclade, dfAugurNextclade$pangolin_lineage)
+class(lineageCount)
+lineageCount<- (lineageCount[order(-lineageCount$n ),])
+View(lineageCount)
+```
+
+#Monthly lineage counts
+
+```{r}
+
+#september2020 lineage count
+september2020Counts <-dfAugurNextclade[dfAugurNextclade$date.x >= "2020-09-01" & dfAugurNextclade$date.x <= "2020-09-30", ]
+#View(september2020Counts)
+september2020lineageCount = count(september2020Counts, september2020Counts$pangolin_lineage)
+september2020lineageCount<- (september2020lineageCount[order(-september2020lineageCount$n ),])
+#View(september2020lineageCount)
+
+
+
+```
+
+# variant frequency matches
+
+```{r}
+#This step takes the dataframe and sorts the substitutions by GISAID ID and Pangolin lineage 
+#frequency set
+freqSet <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "substitutions")]
+#View(freqSet)
+#freqSetPlus <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "substitutions", "deletions", "insertions")]
+#freqSet %>% mutate(substitutions=strsplit(substitutions, ",")) %>% unnest(substitutions)
+
+#freqSet %>% separate_rows(substitutions)
+fullSet <- separate_rows(freqSet, substitutions, sep = ",")
+#View(fullSet)
+
+```
+
+# deletion frequency matches
+
+```{r}
+#This step takes the dataframe and sorts the INDELS by GISAID ID and Pangolin lineage 
+#frequency set
+freqSetDel <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "deletions")]
+#View(freqSetDel)
+
+
+#freqSetDel %>% separate_rows(deletions)
+fullSetDel <- separate_rows(freqSetDel, deletions, sep = ",")
+fullSetDel <- rename(fullSetDel, substitutions = deletions)
+#View(fullSetDel)
+
+#merge substitutions and deletions table to MEGA table
+megaFullSetDelSub <- rbind(fullSet,fullSetDel)
+View(megaFullSetDelSub)
+
+
+```
+
+# missing sequence frequency matches
+
+```{r}
+
+#missing set
+freqSetMiss <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "missing")]
+View(freqSetMiss)
+
+
+#freqSet %>% separate_rows(substitutions)
+fullSetMiss <- separate_rows(freqSetMiss, missing , sep = ",")
+fullSetMiss <- rename(fullSetMiss, substitutions = missing)
+View(fullSetMiss)
+
+#merge substitutions and deletions table to MEGA table
+megaFullSetDelSubMiss <- rbind(megaFullSetDelSub,fullSetMiss)
+View(megaFullSetDelSubMiss)
+```
+
+# AA variant frequency matches
+
+```{r}
+
+#frequency set
+aaFreqSet <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "aaSubstitutions")]
+View(aaFreqSet)
+
+
+#freqSet %>% separate_rows(substitutions)
+aaFullSet <- separate_rows(aaFreqSet, aaSubstitutions, sep = ",")
+View(aaFullSet)
+
+#frequency set
+aaFreqSetDel <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "aaDeletions")]
+View(aaFreqSetDel)
+aaFullSetDel <- rename(aaFreqSetDel, aaSubstitutions = aaDeletions)
+aaFullSetDel <- separate_rows(aaFullSetDel, aaSubstitutions, sep = ",")
+View(aaFullSetDel)
+
+#merge substitutions and deletions table to MEGA table
+
+aaMegaFullSetDelSub <- rbind(aaFullSet,aaFullSetDel)
+View(aaMegaFullSetDelSub)
+
+```
+
+
+#Finding Core sub/del of BA.1.1
+
+```{r}
+#mex query - subset mex genotypes, filter in "core"
+
+#inOmicronOnePtFull <- filter(dfAugurNextclade, pangolin_lineage == "B.1.1.529" | pangolin_lineage == "BA.1" ) 
+inOmicronOnePt <- filter(megaFullSetDelSub,  pangolin_lineage == "BA.1.1" )
+
+
+View(inOmicronOnePt)
+
+inOmicronOnePtCount = count(inOmicronOnePt, inOmicronOnePt$gisaid_epi_isl)
+inOmicronOnePtGisaid <- (inOmicronOnePtCount[order(-inOmicronOnePtCount$n ),])
+View(inOmicronOnePtGisaid)
+#write.xlsx(inOmicronOnePt, file = "/Users/matthewgeniza/Desktop/inOmicronOnePt.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#write.xlsx(inOmicronOnePtGisaid, file = "/Users/matthewgeniza/Desktop/inOmicronOnePtGisaid.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#genotype count
+inOmicronOnePtCountGenotype = count(inOmicronOnePt, inOmicronOnePt$pangolin_lineage)
+inOmicronOnePtGenotype <- (inOmicronOnePtCountGenotype[order(-inOmicronOnePtCountGenotype$n ),])
+#write.xlsx(inOmicronOnePtGenotype, file = "/Users/matthewgeniza/Desktop/inOmicronOnePtGenotype.xlsx", sheetName = "Sheet1", row.names = TRUE)
+View(inOmicronOnePtGenotype)
+#substitution count
+inOmicronOnePtCountSubstitution = count(inOmicronOnePt, inOmicronOnePt$substitutions)
+inOmicronOnePtSubstitution <- (inOmicronOnePtCountSubstitution[order(-inOmicronOnePtCountSubstitution$n ),])
+
+#write.xlsx(inOmicronOnePtSubstitution, file = "/Users/matthewgeniza/Desktop/inBA2Substitution.xlsx", sheetName = "Sheet1", row.names = TRUE)
+View(inOmicronOnePtSubstitution)
+
+```
+
+
+# Finding Core sub/del of B.1.1.7 
+
+```{r}
+#Alpha query - subset Alpha genotypes, filter in "core"
+inAlphaFull <- filter(dfAugurNextclade, pangolin_lineage == "B.1.1.7" ) 
+inAlpha <- filter(megaFullSetDelSub, pangolin_lineage == "B.1.1.7")
+
+
+#View(inAlpha)
+
+inAlphaCount = count(inAlpha, inAlpha$gisaid_epi_isl)
+inAlphaGisaid <- (inAlphaCount[order(-inAlphaCount$n ),])
+#View(inAlphaGisaid)
+#write.xlsx(inAlpha, file = "/Users/matthewgeniza/Desktop/inAlpha.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#write.xlsx(inAlphaGisaid, file = "/Users/matthewgeniza/Desktop/inAlphaGisaid.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#genotype count
+inAlphaCountGenotype = count(inAlpha, inAlpha$pangolin_lineage)
+inAlphaGenotype <- (inAlphaCountGenotype[order(-inAlphaCountGenotype$n ),])
+#write.xlsx(inAlphaGenotype, file = "/Users/matthewgeniza/Desktop/inAlphaGenotype.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#View(inAlphaGenotype)
+#substitution count
+inAlphaCountSubstitution = count(inAlpha, inAlpha$substitutions)
+inAlphaSubstitution <- (inAlphaCountSubstitution[order(-inAlphaCountSubstitution$n ),])
+
+#write.xlsx(inAlphaSubstitution, file = "/Users/matthewgeniza/Desktop/inAlphaSubstitution.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#View(inAlphaSubstitution)
+
+```
+
