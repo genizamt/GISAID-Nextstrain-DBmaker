@@ -59,34 +59,42 @@ augurDF <- as.data.frame(augurDF)
 #View(augurDF)
 
 #load in nextclade data
-nextcladeDF <- list.files(path = "/Users/matthewgeniza/Desktop/OHA_CQLS_Background_Freqency/nextcladeData", pattern = "*tsv", full.names = TRUE) %>% lapply(read_tsv) %>% bind_rows()
+nextcladeDF <- list.files(path = "/Users/matthewgeniza/Desktop/OHA_CQLS_Background_Freqency/nextcladeData/", pattern = "*tsv", full.names = TRUE) %>% lapply(read_tsv) %>% bind_rows()
 
 nextcladeDF <- as.data.frame(nextcladeDF)
+#rename seqName
+colnames(nextcladeDF)[1] <- "strain"
+#remove gisaid and date
+nextcladeDF <- subset (nextcladeDF, select = -c(gisaid_epi_isl,date))
 
 #View(nextcladeDF)
 #merge augur and nextclade based on gisaid id
-dfAugurNextclade <- merge( x = augurDF, y = nextcladeDF, by = "gisaid_epi_isl", all = TRUE)
+dfAugurNextclade <- merge( x = augurDF, y = nextcladeDF, by = "strain")
+
+#remove duplicates
+dfAugurNextclade = dfAugurNextclade[!duplicated(dfAugurNextclade$strain),]
 
 View(dfAugurNextclade)
 
-dfAugurNextclade$date.x <- as.Date(dfAugurNextclade$date.x,  format = "%m/%d/%y")
+dfAugurNextclade$date <- as.Date(dfAugurNextclade$date,  format = "%m/%d/%y")
 
-dfAugurNextclade$date.y <- as.Date(dfAugurNextclade$date.y,  format = "%m/%d/%y")
+#dfAugurNextclade$date.y <- as.Date(dfAugurNextclade$date.y,  format = "%m/%d/%y")
 
 dfAugurNextclade$date_submitted <- as.Date(dfAugurNextclade$date_submitted,  format = "%m/%d/%y")
 
-dfAugurNextclade<- (dfAugurNextclade[order(dfAugurNextclade$date.x ),])
+dfAugurNextclade<- (dfAugurNextclade[order(dfAugurNextclade$date ),])
 
 #removing known miscalls from beta and delta
 dfAugurNextclade <- filter(dfAugurNextclade, gisaid_epi_isl != "EPI_ISL_2304824" & gisaid_epi_isl != "EPI_ISL_2895840" & gisaid_epi_isl != "EPI_ISL_2838583" & gisaid_epi_isl != "EPI_ISL_2838586" & gisaid_epi_isl != "EPI_ISL_2838654" & gisaid_epi_isl != "EPI_ISL_2693134" & gisaid_epi_isl != "EPI_ISL_2785264" & gisaid_epi_isl != "EPI_ISL_3750734") # & date_submitted < "2021-08-11" )
 
-#write_excel_csv(dfAugurNextclade, file = "/Users/matthewgeniza/Desktop/dfAugurNextclade01062022.csv")
+#write_excel_csv(dfAugurNextclade, file = "/Users/matthewgeniza/Desktop/dfAugurNextclade06302022.csv")
 
-#DB <- read_csv("dfAugurNextclade_OR08232021.csv")
+#DB <- read_csv("/Users/matthewgeniza/Desktop/dfAugurNextclade05312022.csv")
+#dfAugurNextclade <- as.data.frame(DB)
 ```
 
 
-#  lineage counts in total datafram
+#  lineage counts in total dataframe
 
 ```{r}
 
@@ -102,11 +110,11 @@ View(lineageCount)
 ```{r}
 
 #september2020 lineage count
-september2020Counts <-dfAugurNextclade[dfAugurNextclade$date.x >= "2020-09-01" & dfAugurNextclade$date.x <= "2020-09-30", ]
+september2020Counts <-dfAugurNextclade[dfAugurNextclade$date >= "2020-09-01" & dfAugurNextclade$date <= "2020-09-30", ]
 #View(september2020Counts)
 september2020lineageCount = count(september2020Counts, september2020Counts$pangolin_lineage)
 september2020lineageCount<- (september2020lineageCount[order(-september2020lineageCount$n ),])
-#View(september2020lineageCount)
+View(september2020lineageCount)
 
 
 
@@ -124,7 +132,7 @@ freqSet <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "substituti
 
 #freqSet %>% separate_rows(substitutions)
 fullSet <- separate_rows(freqSet, substitutions, sep = ",")
-#View(fullSet)
+View(fullSet)
 
 ```
 
@@ -155,17 +163,17 @@ View(megaFullSetDelSub)
 
 #missing set
 freqSetMiss <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "missing")]
-View(freqSetMiss)
+#View(freqSetMiss)
 
 
 #freqSet %>% separate_rows(substitutions)
 fullSetMiss <- separate_rows(freqSetMiss, missing , sep = ",")
 fullSetMiss <- rename(fullSetMiss, substitutions = missing)
-View(fullSetMiss)
+#View(fullSetMiss)
 
 #merge substitutions and deletions table to MEGA table
 megaFullSetDelSubMiss <- rbind(megaFullSetDelSub,fullSetMiss)
-View(megaFullSetDelSubMiss)
+#View(megaFullSetDelSubMiss)
 ```
 
 # AA variant frequency matches
@@ -174,19 +182,19 @@ View(megaFullSetDelSubMiss)
 
 #frequency set
 aaFreqSet <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "aaSubstitutions")]
-View(aaFreqSet)
+#View(aaFreqSet)
 
 
 #freqSet %>% separate_rows(substitutions)
 aaFullSet <- separate_rows(aaFreqSet, aaSubstitutions, sep = ",")
-View(aaFullSet)
+#View(aaFullSet)
 
 #frequency set
 aaFreqSetDel <- dfAugurNextclade[,c("gisaid_epi_isl", "pangolin_lineage", "aaDeletions")]
 View(aaFreqSetDel)
 aaFullSetDel <- rename(aaFreqSetDel, aaSubstitutions = aaDeletions)
 aaFullSetDel <- separate_rows(aaFullSetDel, aaSubstitutions, sep = ",")
-View(aaFullSetDel)
+#View(aaFullSetDel)
 
 #merge substitutions and deletions table to MEGA table
 
@@ -201,28 +209,28 @@ View(aaMegaFullSetDelSub)
 ```{r}
 #mex query - subset mex genotypes, filter in "core"
 
-#inOmicronOnePtFull <- filter(dfAugurNextclade, pangolin_lineage == "B.1.1.529" | pangolin_lineage == "BA.1" ) 
-inOmicronOnePt <- filter(megaFullSetDelSub,  pangolin_lineage == "BA.1.1" )
+#inOmicronTwoFull <- filter(dfAugurNextclade, pangolin_lineage == "B.1.1.529" | pangolin_lineage == "BA.1" ) 
+inOmicronFour <- filter(megaFullSetDelSub,  pangolin_lineage == "BA.4" )
 
 
-View(inOmicronOnePt)
+View(inOmicronFour)
 
-inOmicronOnePtCount = count(inOmicronOnePt, inOmicronOnePt$gisaid_epi_isl)
-inOmicronOnePtGisaid <- (inOmicronOnePtCount[order(-inOmicronOnePtCount$n ),])
-View(inOmicronOnePtGisaid)
-#write.xlsx(inOmicronOnePt, file = "/Users/matthewgeniza/Desktop/inOmicronOnePt.xlsx", sheetName = "Sheet1", row.names = TRUE)
-#write.xlsx(inOmicronOnePtGisaid, file = "/Users/matthewgeniza/Desktop/inOmicronOnePtGisaid.xlsx", sheetName = "Sheet1", row.names = TRUE)
+inOmicronFourCount = count(inOmicronFour, inOmicronFour$gisaid_epi_isl)
+inOmicronFourGisaid <- (inOmicronFourCount[order(-inOmicronFourCount$n ),])
+View(inOmicronFourGisaid)
+#write.xlsx(inOmicronFour, file = "/Users/matthewgeniza/Desktop/inOmicronFour.xlsx", sheetName = "Sheet1", row.names = TRUE)
+#write.xlsx(inOmicronFourGisaid, file = "/Users/matthewgeniza/Desktop/inOmicronFourGisaid.xlsx", sheetName = "Sheet1", row.names = TRUE)
 #genotype count
-inOmicronOnePtCountGenotype = count(inOmicronOnePt, inOmicronOnePt$pangolin_lineage)
-inOmicronOnePtGenotype <- (inOmicronOnePtCountGenotype[order(-inOmicronOnePtCountGenotype$n ),])
-#write.xlsx(inOmicronOnePtGenotype, file = "/Users/matthewgeniza/Desktop/inOmicronOnePtGenotype.xlsx", sheetName = "Sheet1", row.names = TRUE)
-View(inOmicronOnePtGenotype)
+inOmicronFourCountGenotype = count(inOmicronFour, inOmicronFour$pangolin_lineage)
+inOmicronFourGenotype <- (inOmicronFourCountGenotype[order(-inOmicronFourCountGenotype$n ),])
+#write.xlsx(inOmicronFourGenotype, file = "/Users/matthewgeniza/Desktop/inOmicronFourGenotype.xlsx", sheetName = "Sheet1", row.names = TRUE)
+View(inOmicronFourGenotype)
 #substitution count
-inOmicronOnePtCountSubstitution = count(inOmicronOnePt, inOmicronOnePt$substitutions)
-inOmicronOnePtSubstitution <- (inOmicronOnePtCountSubstitution[order(-inOmicronOnePtCountSubstitution$n ),])
+inOmicronFourCountSubstitution = count(inOmicronFour, inOmicronFour$substitutions)
+inOmicronFourSubstitution <- (inOmicronFourCountSubstitution[order(-inOmicronFourCountSubstitution$n ),])
 
-#write.xlsx(inOmicronOnePtSubstitution, file = "/Users/matthewgeniza/Desktop/inBA2Substitution.xlsx", sheetName = "Sheet1", row.names = TRUE)
-View(inOmicronOnePtSubstitution)
+#write.xlsx(inOmicronFourSubstitution, file = "/Users/matthewgeniza/Desktop/inBA4Substitution.xlsx", sheetName = "Sheet1", row.names = TRUE)
+View(inOmicronFourSubstitution)
 
 ```
 
@@ -251,7 +259,7 @@ inAlphaGenotype <- (inAlphaCountGenotype[order(-inAlphaCountGenotype$n ),])
 inAlphaCountSubstitution = count(inAlpha, inAlpha$substitutions)
 inAlphaSubstitution <- (inAlphaCountSubstitution[order(-inAlphaCountSubstitution$n ),])
 
-#write.xlsx(inAlphaSubstitution, file = "/Users/matthewgeniza/Desktop/inAlphaSubstitution.xlsx", sheetName = "Sheet1", row.names = TRUE)
+write.xlsx(inOmicronTwoSubstitution, file = "/Users/matthewgeniza/Desktop/inOmicronTwoSubstitution.xlsx", sheetName = "Sheet1", row.names = TRUE)
 #View(inAlphaSubstitution)
 
 ```
